@@ -21,6 +21,19 @@ class InternalError(Exception):
     pass
 
 
+def memoize(function):
+  memo = {}
+  def wrapper(*args):
+    if args in memo:
+      return memo[args]
+    else:
+      rv = function(*args)
+      memo[args] = rv
+      return rv
+  return wrapper
+
+
+
 #
 # Data Representation plugins
 #
@@ -35,6 +48,7 @@ class VardataAsBinaryFiles(object):
         """ Return size (in bytes) of data representation """
         return len(self(variable))
 
+    @memoize
     def __call__(self, variable):
         """ Return Variable's data representation """
         data = variable[:].tobytes()
@@ -50,6 +64,7 @@ class VardataAsFlatTextFiles(object):
         """ Return size (in bytes) of data representation """
         return len(self(variable))
 
+    @memoize
     def __call__(self, variable):
         """ Return Variable's data representation """
         return ''.join(numpy.char.mod(
@@ -74,7 +89,7 @@ class AttributesAsTextFiles(object):
 # NetCDF filesystem implementation
 #
 
-class NCFS:
+class NCFS(object):
     """
     Main object for netCDF-filesytem operations
     """
