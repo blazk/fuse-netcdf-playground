@@ -175,7 +175,7 @@ class NCFS:
         We are telling FUSE that the current entry is a file
         or a directory using the stat struct.
         In general, if the entry is a directory, st_mode have to be set
-        to S_IFDIR and st_nlink to 2, while if it’s a file, st_mode have
+        to S_IFDIR and st_nlink to 2, while if it is a file, st_mode have
         to be set to S_IFREG (that stands for regular file) and st_nlink
         to 1. Files also require that the st_size (the full file size) is
         specified.
