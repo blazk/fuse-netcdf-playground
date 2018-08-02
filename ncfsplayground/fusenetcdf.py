@@ -251,8 +251,6 @@ class NCFS:
     def read(self, path, size, offset):
         log_call()
         if self.is_var_attribute(path):
-            varname = self.get_varname(path)
-            attrname = self.get_attrname(path)
             attr = self.get_attribute(path)
             return self.attr_repr(attr)[offset:offset+size]
         elif self.is_var_data(path):
