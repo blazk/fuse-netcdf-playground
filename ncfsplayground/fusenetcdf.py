@@ -84,7 +84,7 @@ class NCFS:
         self.vardata_repr = vardata_repr
         # plugin for generation Atributes representations
         self.attr_repr = attr_repr
-        # a table of open files, indexed by a
+        # store mount time, for file timestamps
         self.mount_time = time.time()
 
     def is_var_dir(self, path):
