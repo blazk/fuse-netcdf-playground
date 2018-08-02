@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e
+
+# unmount if wasn't cleanly unmounted last time
+fusermount -u mnt > /dev/null 2>&1 || :
+
+ncpath=samples/ECMWF_ERA-40_subset.nc
+mountpoint=mnt
+
+export PATH=$PWD/bin:$PATH
+export PYTHONPATH=$PWD:$PYTHONPATH
+
+ncfs $ncpath $mountpoint -vv
