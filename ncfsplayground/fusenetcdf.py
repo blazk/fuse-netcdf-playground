@@ -1,12 +1,8 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
-fuse-netcdf project
-
-This is the ESoWC project to create a mountable netcdf file
-in user space using the fusepy and python-netcdf libraries
-
+Exploring ideas for ESoWC project:
+https://github.com/dvalters/fuse-netcdf
 """
 
 import os
@@ -21,10 +17,8 @@ from fuse import FUSE, FuseOSError, Operations
 from errno import EACCES, ENOENT
 
 
-
 class InternalError(Exception):
     pass
-
 
 
 #
@@ -77,7 +71,7 @@ class AttributesAsTextFiles(object):
 
 
 #
-# NetCDF filesystem operations
+# NetCDF filesystem implementation
 #
 
 class NCFS:
