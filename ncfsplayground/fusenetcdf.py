@@ -8,6 +8,7 @@ https://github.com/dvalters/fuse-netcdf
 import os
 import sys
 import netCDF4 as ncpy
+import re
 import time
 import numpy
 import inspect
@@ -18,6 +19,9 @@ from errno import EACCES, ENOENT
 
 
 class InternalError(Exception):
+    pass
+
+class NotFoundError(Exception):
     pass
 
 
@@ -104,31 +108,37 @@ class NCFS(object):
 
     def is_var_dir(self, path):
         """ Test if path is a valid Variable directory path """
-        return path.lstrip('/') in self.dataset.variables
+        return re.search('^/[^/]+$', path) is not None
 
     def is_var_data(self, path):
         """ Test if path is a vaild path to Variable data representation
             TODO: data representation could be a file or a directory.
         """
-        return 'DATA_REPR' in path
+        dirname, basename = os.path.split(path)
+        return self.is_var_dir(dirname) and basename == 'DATA_REPR'
 
     def is_var_dimensions(self, path):
         """ Test if path is a valid path for Variable's 'dimensions' file """
-        return 'dimensions' in path
+        dirname, basename = os.path.split(path)
+        return self.is_var_dir(dirname) and basename == 'dimensions'
 
     def is_var_attribute(self, path):
         """ Test if path is a valid path for Variable's Attribute """
         if '.Trash' in path:
             return False
-        return not (
-                self.is_var_dir(path) or
-                self.is_var_data(path) or
-                self.is_var_dimensions(path))
+        if re.search('^/[^/]+/[^/]+$', path) is not None:
+            return not (self.is_var_data(path) or self.is_var_dimensions(path))
 
     def exists(self, path):
-        """ Test if path already exists """
-        # TODO: implement this
-        return True
+        """ Test if path exists """
+        if (self.is_var_dir(path) or
+            self.is_var_data(path) or
+            self.is_var_dimensions(path)):
+            return self.get_variable(path) is not None
+        elif self.is_var_attribute(path):
+            return self.get_attribute(path) is not None
+        else:
+            return False
 
 
     def is_dir(self, path):
@@ -152,15 +162,21 @@ class NCFS(object):
         return path.split('/')[-1]
 
     def get_variable(self, path):
-        """ Return NetCDF Variable object, given its path """
+        """ Return NetCDF Variable object, given its path, or None """
         varname = self.get_varname(path)
-        return self.dataset.variables[varname]
+        return self.dataset.variables.get(varname, None)
 
     def get_attribute(self, path):
-        """ Return NetCDF Attribute object, given its path """
+        """ Return NetCDF Attribute object, given its path, or None """
         varname = self.get_varname(path)
         attrname = self.get_attrname(path)
-        return self.dataset.variables[varname].getncattr(attrname)
+        var = self.dataset.variables.get(varname, None)
+        if var is None:
+            return None
+        try:
+            return var.getncattr(attrname)
+        except AttributeError:
+            return None
 
     def getncAttrs(self, path):
         """ Return name of NetCDF attributes, given variable's path """
@@ -206,8 +222,7 @@ class NCFS(object):
                 st_nlink = 1,
                 st_size = 4096,
                 st_uid = os.getuid())
-        path = path.lstrip('/')
-        if path == "":
+        if path == "/":
             statdict = self.makeIntoDir(statdict)
         elif self.is_blacklisted(path):
             return statdict
@@ -424,7 +439,7 @@ def main():
     ncfs_operations = NCFSOperations(ncfs)
 
     # launch!
-    fuse = FUSE(ncfs_operations, cmdline.mountpoint,
+    FUSE(ncfs_operations, cmdline.mountpoint,
             nothreads=True, foreground=True)
 
 
