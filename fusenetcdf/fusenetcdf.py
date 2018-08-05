@@ -227,7 +227,6 @@ class NCFS(object):
         """Update the statdict if the item in the VFS should be
         presented as a directory
         """
-        log_call()
         statdict["st_mode"] = statdict["st_mode"] ^ 0o100000 | 0o040000
         for i in [[0o400, 0o100], [0o40, 0o10], [0o4, 0o1]]:
             if (statdict["st_mode"] & i[0]) != 0:
@@ -247,7 +246,6 @@ class NCFS(object):
         to 1. Files also require that the st_size (the full file size) is
         specified.
         """
-        log_call()
         # default attributes, correspond to a regular file
         statdict = dict(
                 st_atime=self.mount_time,
@@ -280,12 +278,10 @@ class NCFS(object):
         return statdict
 
     def getxattr(self, name):
-        log_call()
         """ for now it is fake """
         return 'foo'
 
     def removexattr(self, name):
-        log_call()
         return 0
 
     def readdir(self, path):
@@ -293,7 +289,6 @@ class NCFS(object):
         Called when ls or ll and any other unix command that relies
         on this operation to work.
         """
-        log_call()
         path = path.lstrip("/")
         if path == "":
             # Return a list of netCDF variables
@@ -306,7 +301,6 @@ class NCFS(object):
             return ['.', '..']
 
     def access(self, mode):
-        log_call()
         if self.dataset_file is not None:
             path = self.dataset_file
             # If we can execute it, we should be able to read it too
@@ -316,13 +310,11 @@ class NCFS(object):
             raise FuseOSError(EACCES)
 
     def open(self, path, flags):
-        log_call()
         if not self.is_file(path):
             return ENOENT
         return 0
 
     def read(self, path, size, offset):
-        log_call()
         if self.is_var_attr(path):
             attr = self.get_var_attr(path)
             return self.attr_repr(attr)[offset:offset+size]
@@ -333,7 +325,6 @@ class NCFS(object):
             raise InternalError('read(): unexpected path %s' % path)
 
     def create(self, path, mode):
-        log_call()
         if self.is_var_attr(path):
             self.set_var_attr(path, '')
         else:
@@ -341,7 +332,6 @@ class NCFS(object):
         return 0
 
     def write(self, path, buf, offset, fh=0):
-        log_call()
         if self.is_var_attr(path):
             attr = self.get_var_attr(path)
             attr = write_to_string(attr, buf, offset)
@@ -358,7 +348,7 @@ class NCFS(object):
         return 0
 
     def close(self, fh):
-        log_call()
+        pass
 
 
 class NCFSOperations(Operations):
@@ -463,10 +453,6 @@ class NCFSOperations(Operations):
     fsync = None
     flush = None
     """
-
-
-def log_call():
-    pass
 
 
 def main():
