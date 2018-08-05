@@ -164,7 +164,7 @@ class NCFS(object):
 
     def is_dir(self, path):
         """ Test if path corresponds to a directory-like object """
-        return self.is_var_dir(path)
+        return self.is_var_dir(path) or path == '/'
 
     def is_blacklisted(self, path):
         """ Test if a special file/directory """
@@ -365,8 +365,8 @@ class NCFSOperations(Operations):
                 # print  name of the function and argument values
                 log.debug('{}({})'.format(name, ', '.join(func_args)))
                 result = attr(*args, **kwargs)
-                # print return value
-                log.debug('{}() returned {}'.format(name, repr(result)))
+                ## print return value
+                #log.debug('{}() returned {}'.format(name, repr(result)))
                 return result
             return newfunc
         else:
