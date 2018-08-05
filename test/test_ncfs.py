@@ -60,7 +60,6 @@ class TestIsVarAttribute(unittest.TestCase):
         self.assertFalse(self.ncfs.is_var_attr('/abcd/dimensions'))
 
 
-
 class FakeVariable(object):
     def getncattr(self, name):
         if name == 'fooattr':
@@ -68,42 +67,41 @@ class FakeVariable(object):
         else:
             raise AttributeError()
 
+
 class FakeDataset(object):
     variables = {'foovar': FakeVariable()}
 
 
-
 class TestExists(unittest.TestCase):
 
-     def setUp(self):
-         dataset = FakeDataset()
-         self.ncfs = NCFS(dataset, None, None)
+    def setUp(self):
+        dataset = FakeDataset()
+        self.ncfs = NCFS(dataset, None, None)
 
-     def test_exists_1(self):
-         self.assertTrue(self.ncfs.exists('/foovar'))
+    def test_exists_1(self):
+        self.assertTrue(self.ncfs.exists('/foovar'))
 
-     def test_exists_2(self):
-         self.assertTrue(self.ncfs.exists('/foovar/fooattr'))
+    def test_exists_2(self):
+        self.assertTrue(self.ncfs.exists('/foovar/fooattr'))
 
-     def test_exists_3(self):
-         self.assertFalse(self.ncfs.exists('/foovar/fooattr/foo'))
+    def test_exists_3(self):
+        self.assertFalse(self.ncfs.exists('/foovar/fooattr/foo'))
 
-     def test_exists_4(self):
-         self.assertTrue(self.ncfs.exists('/'))
+    def test_exists_4(self):
+        self.assertTrue(self.ncfs.exists('/'))
 
-     def test_exists_5(self):
-         self.assertTrue(self.ncfs.exists('/foovar/DATA_REPR'))
+    def test_exists_5(self):
+        self.assertTrue(self.ncfs.exists('/foovar/DATA_REPR'))
 
-     def test_exists_6(self):
-         self.assertTrue(self.ncfs.exists('/foovar/dimensions'))
-
+    def test_exists_6(self):
+        self.assertTrue(self.ncfs.exists('/foovar/dimensions'))
 
 
 def create_test_dataset_1():
     ds = Dataset('test.nc', mode='w', diskless=True, format='NETCDF4')
     ds.createDimension('x', 3)
     ds.createDimension('y', 3)
-    ds.createVariable('foovar', float, dimensions = ('x', 'y'))
+    ds.createVariable('foovar', float, dimensions=('x', 'y'))
     v = ds.variables['foovar']
     v.setncattr('fooattr', 'abc')
     return ds
@@ -132,5 +130,6 @@ class TestWrite(unittest.TestCase):
 
     def test_deleting_existing_attr(self):
         self.ncfs.unlink('/foovar/fooattr')
-        self.assertRaises(AttributeError, self.ds.variables['foovar'].getncattr, 'foovar')
-
+        self.assertRaises(AttributeError,
+                          self.ds.variables['foovar'].getncattr,
+                          'foovar')

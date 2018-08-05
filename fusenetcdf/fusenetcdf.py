@@ -365,8 +365,8 @@ class NCFSOperations(Operations):
                 # print  name of the function and argument values
                 log.debug('{}({})'.format(name, ', '.join(func_args)))
                 result = attr(*args, **kwargs)
-                ## print return value
-                #log.debug('{}() returned {}'.format(name, repr(result)))
+                # print return value
+                # log.debug('{}() returned {}'.format(name, repr(result)))
                 return result
             return newfunc
         else:
