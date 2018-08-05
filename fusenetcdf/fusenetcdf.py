@@ -21,6 +21,7 @@ from errno import EACCES, ENOENT
 class InternalError(Exception):
     pass
 
+
 class NotFoundError(Exception):
     pass
 
@@ -31,6 +32,7 @@ def memoize(function):
     values of the decorated function.
     """
     memo = {}
+
     def wrapper(*args):
         if args in memo:
             return memo[args]
@@ -107,7 +109,6 @@ class AttributesAsTextFiles(object):
         return s + '\n'
 
 
-
 #
 # NetCDF filesystem implementation
 #
@@ -152,8 +153,8 @@ class NCFS(object):
     def exists(self, path):
         """ Test if path exists """
         if (self.is_var_dir(path) or
-            self.is_var_data(path) or
-            self.is_var_dimensions(path)):
+                self.is_var_data(path) or
+                self.is_var_dimensions(path)):
             return self.get_variable(path) is not None
         elif self.is_var_attr(path):
             return self.get_var_attr(path) is not None
@@ -222,7 +223,6 @@ class NCFS(object):
         attrs = self.dataset.variables[varname].ncattrs()
         return [attr for attr in attrs]
 
-
     @classmethod
     def makeIntoDir(cls, statdict):
         """Update the statdict if the item in the VFS should be
@@ -234,7 +234,6 @@ class NCFS(object):
             if (statdict["st_mode"] & i[0]) != 0:
                 statdict["st_mode"] = statdict["st_mode"] | i[1]
         return statdict
-
 
     def getattr(self, path):
         """The getattr callback is in charge of reading the metadata of a
@@ -252,20 +251,20 @@ class NCFS(object):
         log_call()
         # default attributes, correspond to a regular file
         statdict = dict(
-                st_atime = self.mount_time,
-                st_ctime = self.mount_time,
-                st_gid = os.getgid(),
-                st_mode = 33188,  # file
-                st_mtime = self.mount_time,
-                st_nlink = 1,
-                st_size = 4096,
-                st_uid = os.getuid())
+                st_atime=self.mount_time,
+                st_ctime=self.mount_time,
+                st_gid=os.getgid(),
+                st_mode=33188,  # file
+                st_mtime=self.mount_time,
+                st_nlink=1,
+                st_size=4096,
+                st_uid=os.getuid())
         if path == "/":
             statdict = self.makeIntoDir(statdict)
         elif self.is_blacklisted(path):
             return statdict
         elif not self.exists(path):
-            log.debug('getattr: %s does not exist' %path)
+            log.debug('getattr: %s does not exist' % path)
             raise FuseOSError(ENOENT)
         elif self.is_var_dir(path):
             statdict = self.makeIntoDir(statdict)
@@ -332,14 +331,14 @@ class NCFS(object):
             var = self.get_variable(path)
             return self.vardata_repr(var)[offset:offset+size]
         else:
-            raise InternalError('read(): unexpected path %s' %path)
+            raise InternalError('read(): unexpected path %s' % path)
 
     def create(self, path, mode):
         log_call()
         if self.is_var_attr(path):
             self.set_var_attr(path, '')
         else:
-            raise InternalError('create(): unexpected path %s' %path)
+            raise InternalError('create(): unexpected path %s' % path)
         return 0
 
     def write(self, path, buf, offset, fh=0):
@@ -350,31 +349,30 @@ class NCFS(object):
             self.set_var_attr(path, attr)
             return len(buf)
         else:
-            raise InternalError('write(): unexpected path %s' %path)
+            raise InternalError('write(): unexpected path %s' % path)
 
     def unlink(self, path):
         if self.is_var_attr(path):
             self.del_var_attr(path)
         else:
-            raise InternalError('unlink(): unexpected path %s' %path)
+            raise InternalError('unlink(): unexpected path %s' % path)
         return 0
 
     def close(self, fh):
         log_call()
 
 
-
 class NCFSOperations(Operations):
     """Inherit from the base fusepy Operations class"""
 
-    def __getattribute__(self,name):
+    def __getattribute__(self, name):
         """ Intercept and print all method calls """
         attr = object.__getattribute__(self, name)
         if hasattr(attr, '__call__'):
             def newfunc(*args, **kwargs):
-                log.debug('before calling %s' %attr.__name__)
+                log.debug('before calling %s' % attr.__name__)
                 result = attr(*args, **kwargs)
-                log.debug('done calling %s' %attr.__name__)
+                log.debug('done calling %s' % attr.__name__)
                 return result
             return newfunc
         else:
@@ -463,17 +461,17 @@ class NCFSOperations(Operations):
     """
 
 
-
 def log_call():
     """print current function name and function arguments"""
-    # Get the previous frame in the stack, otherwise it would be this function!!!
+    # Get the previous frame in the stack,
+    # otherwise it would be this function!!!
     prev_frame = inspect.currentframe().f_back
     func_name = prev_frame.f_code.co_name
     func_args = inspect.getargvalues(prev_frame).locals
-    func_args = ','.join(['{}={}'.format(k, repr(v)) for k, v in func_args.iteritems()])
+    func_args = ','.join(
+            ['{}={}'.format(k, repr(v)) for k, v in func_args.iteritems()])
     # Dump the message + the name of this function to the log.
     log.debug("%s(%s)" % (func_name, func_args))
-
 
 
 def main():
@@ -490,25 +488,25 @@ def main():
     # Read config file, commandline parameters, options
 
     parser = argparse.ArgumentParser(
-            description = 'Mount NetCDF filesystem',
-            prog ='fusenetcdf')
+            description='Mount NetCDF filesystem',
+            prog='fusenetcdf')
 
     parser.add_argument(
-            dest = 'ncpath',
-            metavar = 'PATH',
-            help = 'NetCDF file to be mounted')
+            dest='ncpath',
+            metavar='PATH',
+            help='NetCDF file to be mounted')
 
     parser.add_argument(
-            dest = 'mountpoint',
-            metavar = 'DIR',
-            help = 'mount point directory (must exist)')
+            dest='mountpoint',
+            metavar='DIR',
+            help='mount point directory (must exist)')
 
     parser.add_argument(
             '-v',
-            dest = 'verbosity_level',
-            action ='count',
-            default = 0,
-            help = 'be verbose (-vv for debug messages)')
+            dest='verbosity_level',
+            action='count',
+            default=0,
+            help='be verbose (-vv for debug messages)')
 
     cmdline = parser.parse_args()
 
@@ -535,7 +533,6 @@ def main():
     ncfs_operations = NCFSOperations(ncfs)
     # launch!
     FUSE(ncfs_operations, cmdline.mountpoint, nothreads=True, foreground=True)
-
 
 
 if __name__ == "__main__":
