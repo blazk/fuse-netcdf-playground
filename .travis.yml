@@ -3,6 +3,7 @@ sudo: required
 language: python
 python:
  - '2.7'
+ - '3.5'
 
 matrix:
  allow_failures:
@@ -20,3 +21,5 @@ script:
  - python -m unittest test.test_ncfs
  - py.test --pep8
 
+notifications:
+  email: false
