@@ -369,9 +369,14 @@ class NCFSOperations(Operations):
         attr = object.__getattribute__(self, name)
         if hasattr(attr, '__call__'):
             def newfunc(*args, **kwargs):
-                log.debug('before calling %s' % attr.__name__)
+                func_args = [repr(x) for x in args]
+                func_kwargs = ['{}={}'.format(k, repr(v)) for k, v in kwargs]
+                func_args.extend(func_kwargs)
+                # print  name of the function and argument values
+                log.debug('{}({})'.format(name, ', '.join(func_args)))
                 result = attr(*args, **kwargs)
-                log.debug('done calling %s' % attr.__name__)
+                # print return value
+                log.debug('{}() returned {}'.format(name, repr(result)))
                 return result
             return newfunc
         else:
@@ -461,16 +466,7 @@ class NCFSOperations(Operations):
 
 
 def log_call():
-    """print current function name and function arguments"""
-    # Get the previous frame in the stack,
-    # otherwise it would be this function!!!
-    prev_frame = inspect.currentframe().f_back
-    func_name = prev_frame.f_code.co_name
-    func_args = inspect.getargvalues(prev_frame).locals
-    func_args = ','.join(
-            ['{}={}'.format(k, repr(v)) for k, v in func_args.iteritems()])
-    # Dump the message + the name of this function to the log.
-    log.debug("%s(%s)" % (func_name, func_args))
+    pass
 
 
 def main():
