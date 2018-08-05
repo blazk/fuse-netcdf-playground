@@ -1,5 +1,6 @@
 import unittest
-from ncfsplayground.fusenetcdf import NCFS
+from fusenetcdf.fusenetcdf import NCFS
+from netCDF4 import Dataset
 
 
 class TestIsVarDir(unittest.TestCase):
@@ -43,38 +44,39 @@ class TestIsVarAttribute(unittest.TestCase):
     def setUp(self):
         self.ncfs = NCFS(None, None, None)
 
-    def test_is_var_attribute_1(self):
-        self.assertFalse(self.ncfs.is_var_attribute('/abcd'))
+    def test_is_var_attr_1(self):
+        self.assertFalse(self.ncfs.is_var_attr('/abcd'))
 
-    def test_is_var_attribute_2(self):
-        self.assertTrue(self.ncfs.is_var_attribute('/abcd/def'))
+    def test_is_var_attr_2(self):
+        self.assertTrue(self.ncfs.is_var_attr('/abcd/def'))
 
-    def test_is_var_attribute_3(self):
-        self.assertFalse(self.ncfs.is_var_attribute('/'))
+    def test_is_var_attr_3(self):
+        self.assertFalse(self.ncfs.is_var_attr('/'))
 
-    def test_is_var_attribute_4(self):
-        self.assertFalse(self.ncfs.is_var_attribute('/abcd/DATA_REPR'))
+    def test_is_var_attr_4(self):
+        self.assertFalse(self.ncfs.is_var_attr('/abcd/DATA_REPR'))
 
-    def test_is_var_attribute_5(self):
-        self.assertFalse(self.ncfs.is_var_attribute('/abcd/dimensions'))
+    def test_is_var_attr_5(self):
+        self.assertFalse(self.ncfs.is_var_attr('/abcd/dimensions'))
 
 
-class StubVariable(object):
+
+class FakeVariable(object):
     def getncattr(self, name):
         if name == 'fooattr':
             return 'bar'
         else:
             raise AttributeError()
 
+class FakeDataset(object):
+    variables = {'foovar': FakeVariable()}
 
-class StubDataset(object):
-    variables = {'foovar': StubVariable()}
 
 
 class TestExists(unittest.TestCase):
 
      def setUp(self):
-         dataset = StubDataset()
+         dataset = FakeDataset()
          self.ncfs = NCFS(dataset, None, None)
 
      def test_exists_1(self):
@@ -85,3 +87,50 @@ class TestExists(unittest.TestCase):
 
      def test_exists_3(self):
          self.assertFalse(self.ncfs.exists('/foovar/fooattr/foo'))
+
+     def test_exists_4(self):
+         self.assertTrue(self.ncfs.exists('/'))
+
+     def test_exists_5(self):
+         self.assertTrue(self.ncfs.exists('/foovar/DATA_REPR'))
+
+     def test_exists_6(self):
+         self.assertTrue(self.ncfs.exists('/foovar/dimensions'))
+
+
+
+def create_test_dataset_1():
+    ds = Dataset('test.nc', mode='w', diskless=True, format='NETCDF4')
+    ds.createDimension('x', 3)
+    ds.createDimension('y', 3)
+    ds.createVariable('foovar', float, dimensions = ('x', 'y'))
+    v = ds.variables['foovar']
+    v.setncattr('fooattr', 'abc')
+    return ds
+
+
+class TestWrite(unittest.TestCase):
+
+    def setUp(self):
+        self.ds = create_test_dataset_1()
+        self.ncfs = NCFS(self.ds, None, None)
+
+    def tearDown(self):
+        self.ds.close()
+
+    def test_writing_to_existing_attr(self):
+        self.ncfs.write('/foovar/fooattr', '123', offset=0)
+        self.assertEqual(self.ds.variables['foovar'].fooattr, '123')
+
+    def test_creating_new_attr(self):
+        self.ncfs.create('/foovar/xyz', mode=int('0100644', 8))
+        self.assertEqual(self.ds.variables['foovar'].xyz, '')
+
+    def test_appending_to_existing_attr(self):
+        self.ncfs.write('/foovar/fooattr', '123', offset=3)
+        self.assertEqual(self.ds.variables['foovar'].fooattr, 'abc123')
+
+    def test_deleting_existing_attr(self):
+        self.ncfs.unlink('/foovar/fooattr')
+        self.assertRaises(AttributeError, self.ds.variables['foovar'].getncattr, 'foovar')
+

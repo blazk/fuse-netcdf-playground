@@ -1,0 +1,21 @@
+sudo: required
+language: python
+python:
+ - '3.4'
+ - '3.5'
+ - '3.6'
+ - '2.7'
+
+matrix:
+ allow_failures:
+  - python: '3.3'
+
+install:
+ - sudo apt-get install libfuse-dev
+ - pip install --upgrade pip
+ - pip install -r requirements.txt
+
+script:
+ - python -m unittest test.test_ncfs
+ - py.test --pep8
+

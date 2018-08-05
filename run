@@ -1,14 +1,16 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 # unmount if wasn't cleanly unmounted last time
 fusermount -u mnt > /dev/null 2>&1 || :
 
 ncpath=samples/ECMWF_ERA-40_subset.nc
+ncpath_tmp=${ncpath}.copy
 mountpoint=mnt
 
 export PATH=$PWD/bin:$PATH
 export PYTHONPATH=$PWD:$PYTHONPATH
 
-ncfs $ncpath $mountpoint -vv
+cp $ncpath $ncpath_tmp
+ncfs $ncpath_tmp $mountpoint -vv

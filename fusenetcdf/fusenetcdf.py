@@ -26,16 +26,30 @@ class NotFoundError(Exception):
 
 
 def memoize(function):
-  memo = {}
-  def wrapper(*args):
-    if args in memo:
-      return memo[args]
-    else:
-      rv = function(*args)
-      memo[args] = rv
-      return rv
-  return wrapper
+    """
+    Caching decorator; caches return
+    values of the decorated function.
+    """
+    memo = {}
+    def wrapper(*args):
+        if args in memo:
+            return memo[args]
+        else:
+            rv = function(*args)
+            memo[args] = rv
+            return rv
+    return wrapper
 
+
+def write_to_string(string, buf, offset):
+    """
+    Implements someting like string[offset:offset+len(buf)] = buf
+    (which is not be possible as strings are immutable).
+    """
+    string = list(string)
+    buf = list(buf)
+    string[offset:offset+len(buf)] = buf
+    return ''.join(string)
 
 
 #
@@ -85,7 +99,12 @@ class AttributesAsTextFiles(object):
 
     def __call__(self, attr):
         """ Return array of bytes representing attribute's value """
-        return str(attr) + '\n'
+        s = str(attr)
+        # do not append a newline if attribute is
+        # empty or if it already ends with a newline
+        if not s or s[-1] == '\n':
+            return s
+        return s + '\n'
 
 
 
@@ -99,6 +118,7 @@ class NCFS(object):
     """
     def __init__(self, dataset, vardata_repr, attr_repr):
         self.dataset = dataset
+        self.dataset_is_writeable = False
         # plugin for generating Variable's data representations
         self.vardata_repr = vardata_repr
         # plugin for generation Atributes representations
@@ -122,7 +142,7 @@ class NCFS(object):
         dirname, basename = os.path.split(path)
         return self.is_var_dir(dirname) and basename == 'dimensions'
 
-    def is_var_attribute(self, path):
+    def is_var_attr(self, path):
         """ Test if path is a valid path for Variable's Attribute """
         if '.Trash' in path:
             return False
@@ -135,11 +155,12 @@ class NCFS(object):
             self.is_var_data(path) or
             self.is_var_dimensions(path)):
             return self.get_variable(path) is not None
-        elif self.is_var_attribute(path):
-            return self.get_attribute(path) is not None
+        elif self.is_var_attr(path):
+            return self.get_var_attr(path) is not None
+        elif path == '/':
+            return True
         else:
             return False
-
 
     def is_dir(self, path):
         """ Test if path corresponds to a directory-like object """
@@ -154,7 +175,10 @@ class NCFS(object):
         return not self.is_dir(path)
 
     def get_varname(self, path):
-        """ Return NetCDF variable name, given its path """
+        """
+        Return NetCDF variable name, given its path.
+        The path can be variable, attribute, data repr or dimensions path
+        """
         return path.lstrip('/').split('/', 1)[0]
 
     def get_attrname(self, path):
@@ -166,7 +190,7 @@ class NCFS(object):
         varname = self.get_varname(path)
         return self.dataset.variables.get(varname, None)
 
-    def get_attribute(self, path):
+    def get_var_attr(self, path):
         """ Return NetCDF Attribute object, given its path, or None """
         varname = self.get_varname(path)
         attrname = self.get_attrname(path)
@@ -177,6 +201,20 @@ class NCFS(object):
             return var.getncattr(attrname)
         except AttributeError:
             return None
+
+    def set_var_attr(self, path, value):
+        """
+        Set value of an attribute, given it's path.
+        If attribute doesn't exist it will be created.
+        """
+        attrname = self.get_attrname(path)
+        var = self.get_variable(path)
+        var.setncattr(attrname, value)
+
+    def del_var_attr(self, path):
+        attrname = self.get_attrname(path)
+        var = self.get_variable(path)
+        var.delncattr(attrname)
 
     def getncAttrs(self, path):
         """ Return name of NetCDF attributes, given variable's path """
@@ -227,12 +265,13 @@ class NCFS(object):
         elif self.is_blacklisted(path):
             return statdict
         elif not self.exists(path):
+            log.debug('getattr: %s does not exist' %path)
             raise FuseOSError(ENOENT)
         elif self.is_var_dir(path):
             statdict = self.makeIntoDir(statdict)
             statdict["st_size"] = 4096
-        elif self.is_var_attribute(path):
-            attr = self.get_attribute(path)
+        elif self.is_var_attr(path):
+            attr = self.get_var_attr(path)
             statdict["st_size"] = self.attr_repr.size(attr)
         elif self.is_var_data(path):
             var = self.get_variable(path)
@@ -243,7 +282,13 @@ class NCFS(object):
         return statdict
 
     def getxattr(self, name):
+        log_call()
+        """ for now it is fake """
         return 'foo'
+
+    def removexattr(self, name):
+        log_call()
+        return 0
 
     def readdir(self, path):
         """Overrides readdir.
@@ -275,24 +320,44 @@ class NCFS(object):
     def open(self, path, flags):
         log_call()
         if not self.is_file(path):
-            raise FuseOSOSError('not a file')
+            return ENOENT
         return 0
 
     def read(self, path, size, offset):
         log_call()
-        if self.is_var_attribute(path):
-            attr = self.get_attribute(path)
+        if self.is_var_attr(path):
+            attr = self.get_var_attr(path)
             return self.attr_repr(attr)[offset:offset+size]
         elif self.is_var_data(path):
             var = self.get_variable(path)
             return self.vardata_repr(var)[offset:offset+size]
         else:
-            #This should never happen
-            raise InternalError('read: unexpected path {}'.format(path))
+            raise InternalError('read(): unexpected path %s' %path)
 
-    def write(self, path, data, offset):
-        #TODO: to be implemented
-        return len(data)
+    def create(self, path, mode):
+        log_call()
+        if self.is_var_attr(path):
+            self.set_var_attr(path, '')
+        else:
+            raise InternalError('create(): unexpected path %s' %path)
+        return 0
+
+    def write(self, path, buf, offset, fh=0):
+        log_call()
+        if self.is_var_attr(path):
+            attr = self.get_var_attr(path)
+            attr = write_to_string(attr, buf, offset)
+            self.set_var_attr(path, attr)
+            return len(buf)
+        else:
+            raise InternalError('write(): unexpected path %s' %path)
+
+    def unlink(self, path):
+        if self.is_var_attr(path):
+            self.del_var_attr(path)
+        else:
+            raise InternalError('unlink(): unexpected path %s' %path)
+        return 0
 
     def close(self, fh):
         log_call()
@@ -301,6 +366,19 @@ class NCFS(object):
 
 class NCFSOperations(Operations):
     """Inherit from the base fusepy Operations class"""
+
+    def __getattribute__(self,name):
+        """ Intercept and print all method calls """
+        attr = object.__getattribute__(self, name)
+        if hasattr(attr, '__call__'):
+            def newfunc(*args, **kwargs):
+                log.debug('before calling %s' %attr.__name__)
+                result = attr(*args, **kwargs)
+                log.debug('done calling %s' %attr.__name__)
+                return result
+            return newfunc
+        else:
+            return attr
 
     def __init__(self, ncfs):
         self.ncfs = ncfs
@@ -320,7 +398,7 @@ class NCFSOperations(Operations):
     def read(self, path, size, offset, fh):
         return self.ncfs.read(path, size, offset)
 
-    def write(self, path, data, offset, fh):
+    def write(self, path, data, offset):
         return self.ncfs.write(path, data, offset)
 
     def getattr(self, path, fh=None):
@@ -328,6 +406,9 @@ class NCFSOperations(Operations):
 
     def getxattr(self, path, name):
         return self.ncfs.getxattr(name)
+
+    def removexattr(self, path, name):
+        return self.ncfs.removexattr(name)
 
     def listxattr(self, path):
         return self.ncfs.listxattr()
@@ -350,7 +431,22 @@ class NCFSOperations(Operations):
     def open(self, path, flags):
         return self.ncfs.open(path, flags)
 
-    truncate = None
+    def create(self, path, mode):
+        return self.ncfs.create(path, mode)
+
+    def write(self, path, buf, offset, fh):
+        return self.ncfs.write(path, buf, offset, fh)
+
+    def truncate(self, path, offset):
+        return 0
+
+    def unlink(self, path):
+        return self.ncfs.unlink(path)
+
+    def write_buf(self, path, buf, off, fh):
+        return 0
+
+    """
     rename = None
     symlink = None
     setxattr = None
@@ -359,12 +455,12 @@ class NCFSOperations(Operations):
     mkdir = None
     mknod = None
     rmdir = None
-    unlink = None
     chmod = None
     chown = None
     create = None
     fsync = None
     flush = None
+    """
 
 
 
@@ -418,18 +514,18 @@ def main():
 
     # setup logging
 
-    if cmdline.verbosity_level == 1:
+    if cmdline.verbosity_level == 0:
+        loglevel = log.ERROR
+    elif cmdline.verbosity_level == 1:
         loglevel = log.INFO
-    elif cmdline.verbosity_level >= 2:
-        loglevel = log.DEBUG
     else:
-        loglevel = None
-    if loglevel is not None:
-        log.basicConfig(format='%(message)s', level=loglevel)
+        loglevel = log.DEBUG
+    log.basicConfig(format='%(message)s', level=loglevel)
 
     # build the application
 
-    dataset = ncpy.Dataset(cmdline.ncpath, 'r')
+    # open file for reading and writing
+    dataset = ncpy.Dataset(cmdline.ncpath, 'r+')
     # create plugins for generating data and atribute representations
     vardata_repr = VardataAsFlatTextFiles(fmt='%f')
     attr_repr = AttributesAsTextFiles()
@@ -437,10 +533,8 @@ def main():
     ncfs = NCFS(dataset, vardata_repr, attr_repr)
     # create FUSE Operations (does it need to be a separate class?)
     ncfs_operations = NCFSOperations(ncfs)
-
     # launch!
-    FUSE(ncfs_operations, cmdline.mountpoint,
-            nothreads=True, foreground=True)
+    FUSE(ncfs_operations, cmdline.mountpoint, nothreads=True, foreground=True)
 
 
 
