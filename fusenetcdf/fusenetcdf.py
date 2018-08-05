@@ -119,7 +119,6 @@ class NCFS(object):
     """
     def __init__(self, dataset, vardata_repr, attr_repr):
         self.dataset = dataset
-        self.dataset_is_writeable = False
         # plugin for generating Variable's data representations
         self.vardata_repr = vardata_repr
         # plugin for generation Atributes representations
